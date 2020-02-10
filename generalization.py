@@ -13,20 +13,21 @@ from matplotlib import pyplot as plt
 from torchvision import utils
 #from skimage.morphology import disk
 #from skimage.filters.rank import median
+from imageio import imwrite
 
-net             = 'ZERO-ROT-VGG-UNET'
-projs           =  32
-input_dir       = "D:\\DADOS\\datasets-doutorado\\APPLE-DL-EXTENDED-128-zero-rot-{}-projs\\input\\".format(projs)
-target_dir      = "D:\\DADOS\\datasets-doutorado\\APPLE-DL-EXTENDED-128-zero-rot-{}-projs\\target\\".format(projs)
-means           = data_mean_value("train3.csv", input_dir) / 255.
+net             = 'DENSE-UNET3D'
+projs           =  4
+input_dir       = "D:\\Datasets\\demo_plates_{}_projs\\input\\".format(projs)
+target_dir      = "D:\\Datasets\\demo_plates_{}_projs\\target\\".format(projs)
+means           = data_mean_value("train2.csv", input_dir) / 255.
 
-model_src = ".\\models\\{}-model-{}-projs".format(net, projs)
+model_src = "./models/{}-model-{}-projs".format(net, projs)
 
 
 
 def evaluate_img():
 
-    test_data = Tomographic_Dataset(csv_file="test3.csv", phase='val', flip_rate=0, train_csv="train3.csv",
+    test_data = Tomographic_Dataset(csv_file="test2.csv", phase='val', flip_rate=0, train_csv="train2.csv",
                                     input_dir=input_dir, target_dir=target_dir)
     test_loader = DataLoader(test_data, batch_size=1, num_workers=1)
 
@@ -35,7 +36,7 @@ def evaluate_img():
 
     print("{} files for testing....".format(n_tests))
 
-    folder = ".\\results-{}-{}-projs\\".format(net, projs)
+    folder = "./results-{}-{}-projs/".format(net, projs)
     if not os.path.exists(folder):
         os.makedirs(folder)
 
@@ -44,51 +45,68 @@ def evaluate_img():
     for iter, batch in enumerate(test_loader):
 
         name = batch['file'][0]
-        dest = os.path.join(folder, name[0:len(name)-3])
+        dest = os.path.join(folder, name)
         if not os.path.exists(dest):
             os.mkdir(dest)
+
+        if not os.path.exists(dest+"//pred"):
+            os.mkdir(dest+"//pred")
+        if not os.path.exists(dest + "//gt"):
+            os.mkdir(dest + "//gt")
+        if not os.path.exists(dest + "//input"):
+            os.mkdir(dest + "//input")
 
         #print(batch['X'].shape)
         #type(batch['X'])
         input = Variable(batch['X'].cuda())
         print(input.shape)
+
         start = time.time()
+
         output = fcn_model(input)
+
+        output = output.data.cpu().numpy()
+        N, _, z, h, w = output.shape
+        y = output.reshape(N, z, h, w)
+
+        input = batch['X'].cpu().numpy()
+        input = input + means[0]
+        final_rec = input[0, 0, :, :, :] - y
+
         end = time.time()
         elapsed = end-start
         execution_time[count] = elapsed
-        #print('execution: {} seconds'.format(elapsed))
-        print(elapsed)
+        print('execution: {} seconds'.format(elapsed))
+
         count = count + 1
 
-        output = output.data.cpu().numpy()
 
-        N, _, h, w = output.shape
-        y = output[0, 0, :, :]
-        target = batch['l'].cpu().numpy().reshape(N, h, w)
 
-        img_batch = batch['X']
-        img_batch[:, 0, ...].add_(means[0])
-        img_batch[:, 1, ...].add_(means[1])
-        img_batch[:, 2, ...].add_(means[2])
 
-        grid = utils.make_grid(img_batch)
-        x = grid.numpy()[::-1].transpose((1, 2, 0))
 
-        final_rec = x[:,:,0]-y
-        #final_rec = y+0.5
 
-        original = scipy.misc.imread(batch['o'][0], mode='RGB')
+        #grid = utils.make_grid(img_batch)
+        #x = grid.numpy()[::-1].transpose((1, 2, 0))
 
+        target = batch['l'].cpu().numpy().reshape(N, z, h, w)
+        original = batch['o'].cpu().numpy()
+        #original = scipy.misc.imread(batch['o'][0], mode='RGB')
+
+        #gt = input[0,:,:,:]-target
+
+        #for i in range(16):
+            #imwrite(dest+"\\pred\\slice_{:02d}.png".format(i), final_rec[0,i,:,:])
+            #imwrite(dest+"\\gt\\slice_{:02d}.png".format(i), original[0,i,:,:] )
+            #imwrite(dest+"\\input\\slice_{:02d}.png".format(i), input[0, 0,i,:,:])
+            #imwrite(dest+"\\output_silce_{}.png".format(i), y[0,i,:,:])
 
 
         #final_rec = np.transpose(final_rec)
-
-        scipy.misc.imsave(dest+'\\target-residual.png', target[0,:,:])
-        scipy.misc.imsave(dest+'\\residual.png', y)
-        scipy.misc.imsave(dest+'\\final_rec.png', final_rec)
-        scipy.misc.imsave(dest+'\\input.png', x)
-        scipy.misc.imsave(dest+'\\original.png', original)
+        #scipy.misc.imsave(dest+'\\target-residual.png', target[0,:,:])
+        #scipy.misc.imsave(dest+'\\residual.png', y)
+        #scipy.misc.imsave(dest+'\\final_rec.png', final_rec)
+        #scipy.misc.imsave(dest+'\\input.png', x)
+        #scipy.misc.imsave(dest+'\\original.png', original)
 
 
 

@@ -80,7 +80,14 @@ class Tomographic_Dataset(Dataset):
 
 
         (_, file) = os.path.split(label_name)
-        original   = original_src+file[0:len(file)-3]+'png'
+
+        original_box = np.zeros((16, 128, 128))
+        original   = original_src+img_name
+        count = 0
+        for file in os.listdir(original):
+            slice     = imread(original+"\\"+file, pilmode='F')
+            original_box[count+3, :, :] = slice
+            count = count + 1
 
 
         if self.crop:
@@ -101,6 +108,9 @@ class Tomographic_Dataset(Dataset):
         #img[0] -= self.means[0]
         #img[1] -= self.means[1]
         #img[2] -= self.means[2]
+        input_box = input_box/255.
+        input_box = input_box-self.means[0]
+
 
         # convert to tensor
         input_box = torch.from_numpy(input_box.copy()).float()
@@ -116,7 +126,7 @@ class Tomographic_Dataset(Dataset):
                 for W in range(w):
                     target[0, Z, H, W] = output_box[Z, H, W]
 
-        sample = {'X': input_box, 'Y': target, 'l': output_box, 'o': original, 'file': img_name}
+        sample = {'X': input_box, 'Y': target, 'l': output_box, 'o': original_box, 'file': img_name}
 
         return sample
 

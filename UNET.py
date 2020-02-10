@@ -8,6 +8,413 @@ import torch.optim as optim
 from torchvision import models
 from torchvision.models.vgg import VGG
 
+class ResidualDenseBLock(nn.Module):
+
+    def __init__(self, in_channels, out_channels, opt):
+
+        super(ResidualDenseBLock, self).__init__()
+
+        self.relu = nn.ReLU(inplace=True)
+        self.conv1_1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.conv1_2 = nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv1_3 = nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv1_4 = nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm3d(out_channels)
+        self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
+        self.cat_1 = nn.Conv3d(out_channels*3,out_channels, kernel_size=3, padding=1)
+        if opt == "encoder":
+            self.final = nn.MaxPool3d(kernel_size=2, stride=2)
+        else:
+            self.final = nn.ConvTranspose3d(out_channels, out_channels, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+
+
+    def forward(self, x):
+
+        ya = self.bn1(self.relu(self.conv1_1(x)))
+        yb = self.bn1(self.relu(self.conv1_2(ya)))
+        yc = self.bn1(self.relu(self.conv1_2(ya+yb)))
+        yd = self.bn1(self.relu(self.conv1_2(ya+yb+yc)))
+
+        concat = torch.cat([yb, yc, yd], 1)
+        y = ya + self.bn1(self.relu(self.cat_1(concat)))
+        y = self.final(y)
+
+        return y
+
+class MiddleCodification(nn.Module):
+
+    def __init__(self, channels):
+        super(MiddleCodification, self).__init__()
+        self.relu = nn.ReLU(inplace=True)
+        self.conv_1 = nn.Conv3d(channels, 2*channels, kernel_size=3, padding=1)
+        self.conv_2 = nn.Conv3d(2*channels, 2*channels, kernel_size=3, padding=1)
+        self.conv_3 = nn.Conv3d(2*channels, channels, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm3d(channels)
+        self.bn2 = nn.BatchNorm3d(2*channels)
+
+    def forward(self, x):
+
+        y = self.bn2(self.relu(self.conv_1(x)))
+        y = self.bn2(self.relu(self.conv_2(y)))
+        y = self.bn1(self.relu(self.conv_3(y)))
+
+        return y
+
+
+class L4_DENSE_RED_3D(nn.Module):
+
+    def __init__(self):
+
+        super().__init__()
+        self.res1 = ResidualDenseBLock(1,64, "encoder")
+        self.res2 = ResidualDenseBLock(64, 128, "encoder")
+        self.res3 = ResidualDenseBLock(128, 256, "encoder")
+        self.res4 = ResidualDenseBLock(256, 512, "encoder")
+        self.middle = MiddleCodification(512)
+        self.res5 = ResidualDenseBLock(512, 256, "decoder")
+        self.res6 = ResidualDenseBLock(256, 128, "decoder")
+        self.res7 = ResidualDenseBLock(128,64, "decoder")
+        self.res8 = ResidualDenseBLock(64, 1, "decoder")
+
+    def forward(self, x):
+
+        y1 = self.res1(x)
+        y2 = self.res2(y1)
+        y3 = self.res3(y2)
+        y4 = self.res4(y3)
+        y5 = self.middle(y4)
+        y7 = self.res5(y5+y4)
+        y8 = self.res6(y7+y3)
+        y9 = self.res7(y8+y2)
+        y10 = self.res8(y9+y1)
+
+        return y10
+
+
+class L3_DENSE_RED_3D(nn.Module):
+
+    def __init__(self):
+
+        super().__init__()
+        self.res1 = ResidualDenseBLock(1,64, "encoder")
+        self.res2 = ResidualDenseBLock(64, 128, "encoder")
+        self.res3 = ResidualDenseBLock(128, 256, "encoder")
+        self.middle = MiddleCodification(256)
+        self.res4 = ResidualDenseBLock(256, 128, "decoder")
+        self.res5 = ResidualDenseBLock(128,64, "decoder")
+        self.res6 = ResidualDenseBLock(64, 1, "decoder")
+
+    def forward(self, x):
+
+        y1 = self.res1(x)
+        y2 = self.res2(y1)
+        y3 = self.res3(y2)
+        y4 = self.middle(y3)
+        y5 = self.res4(y4+y3)
+        y6 = self.res5(y5+y2)
+        y7 = self.res6(y6+y1)
+
+        return y7
+
+class L2_DENSE_RED_3D(nn.Module):
+
+    def __init__(self):
+
+        super().__init__()
+        self.res1 = ResidualDenseBLock(1,64, "encoder")
+        self.res2 = ResidualDenseBLock(64, 128, "encoder")
+        self.middle = MiddleCodification(128)
+        self.res3 = ResidualDenseBLock(128,64, "decoder")
+        self.res4 = ResidualDenseBLock(64, 1, "decoder")
+
+    def forward(self, x):
+
+        y1 = self.res1(x)
+        y2 = self.res2(y1)
+        y3 = self.middle(y2)
+        y4 = self.res3(y3+y2)
+        y5 = self.res4(y4+y1)
+
+        return y5
+
+class L1_DENSE_RED_3D(nn.Module):
+
+    def __init__(self):
+
+        super().__init__()
+        self.res1 = ResidualDenseBLock(1,64, "encoder")
+        self.middle = MiddleCodification(64)
+        self.res2 = ResidualDenseBLock(64,1, "decoder")
+
+    def forward(self, x):
+
+        y1 = self.res1(x)
+        y2 = self.middle(y1)
+        y3 = self.res2(y1+y2)
+
+        return y3
+
+class FULLY_DENSE_UNET_3D(nn.Module):
+
+    def __init__(self):
+
+        super().__init__()
+        #encoder
+        self.relu = nn.ReLU(inplace=True)
+        self.conv1_1 = nn.Conv3d(1, 64, kernel_size=3, padding=1)
+        self.conv1_2 = nn.Conv3d(64, 64, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm3d(64)
+        self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
+
+        self.conv2_1 = nn.Conv3d(64, 128, kernel_size=3, padding=1)
+        self.conv2_2 = nn.Conv3d(192, 128, kernel_size=3, padding=1)
+        self.conv2_3 = nn.Conv3d(320, 128, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm3d(128)
+
+        self.conv3_1 = nn.Conv3d(128, 256, kernel_size=3, padding=1)
+        self.conv3_2 = nn.Conv3d(384, 256, kernel_size=3, padding=1)
+        self.conv3_3 = nn.Conv3d(640, 256, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm3d(256)
+
+        self.conv4_1 = nn.Conv3d(256, 512, kernel_size=3, padding=1)
+        self.conv4_2 = nn.Conv3d(768, 512, kernel_size=3, padding=1)
+        self.conv4_3 = nn.Conv3d(1280, 512, kernel_size=3, padding=1)
+        self.bn4 = nn.BatchNorm3d(512)
+
+        #middle
+        self.conv5_1 = nn.Conv3d(512, 512, kernel_size=3, padding=1)
+        self.conv5_2 = nn.Conv3d(512, 1024, kernel_size=3, padding=1)
+        self.conv5_3 = nn.Conv3d(1024, 512, kernel_size=3, padding=1)
+        self.bn5 = nn.BatchNorm3d(1024)
+
+        #decoder
+        self.deconv6_1 = nn.ConvTranspose3d(512, 512, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.conv6_2 = nn.Conv3d(1024, 512, kernel_size=3, padding=1)
+        self.conv6_3 = nn.Conv3d(1024, 512, kernel_size=3, padding=1)
+        self.conv6_4 = nn.Conv3d(1536, 256, kernel_size=3, padding=1)
+
+        self.deconv7_1 = nn.ConvTranspose3d(256, 256, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.conv7_2 = nn.Conv3d(512, 256, kernel_size=3, padding=1)
+        self.conv7_3 = nn.Conv3d(512, 256, kernel_size=3, padding=1)
+        self.conv7_4 = nn.Conv3d(768, 128, kernel_size=3, padding=1)
+
+        self.deconv8_1 = nn.ConvTranspose3d(128, 128, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.conv8_2 = nn.Conv3d(256, 128, kernel_size=3, padding=1)
+        self.conv8_3 = nn.Conv3d(256, 128, kernel_size=3, padding=1)
+        self.conv8_4 = nn.Conv3d(384, 64, kernel_size=3, padding=1)
+
+        self.deconv9_1 = nn.ConvTranspose3d(64, 64, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.conv9_2 = nn.Conv3d(128, 64, kernel_size=3, padding=1)
+        self.conv9_3 = nn.Conv3d(64, 64, kernel_size=3, padding=1)
+        self.conv9_4 = nn.Conv3d(64, 1, kernel_size=1)
+        self.outputer = nn.Tanh()
+
+    def forward(self, x):
+
+        #encoder
+        #4x1x16x128x128
+        y = self.bn1(self.relu(self.conv1_1(x))) #4x64x16x128x128
+        y = self.bn1(self.relu(self.conv1_2(y))) #4x64x16x128x128
+        y1 = y #4x64x16x128x128
+        y = self.pool(y) #4x64x8x64x64
+
+
+        ya = self.bn2(self.relu(self.conv2_1(y)))   #4x128x8x64x64
+        concat = torch.cat([y,ya], 1)
+        yb = self.bn2(self.relu(self.conv2_2(concat))) #4x128x8x64x64
+        concat = torch.cat([y, ya, yb], 1)
+        yc = self.bn2(self.relu(self.conv2_3(concat))) #4x128x8x64x64
+        y2 = yc #4x128x8x64x64
+
+        yg = self.pool(y2) #4x128x4x32x32
+        yh = self.bn3(self.relu(self.conv3_1(yg))) #4x256x4x32x32
+        concat = torch.cat([yg, yh], 1)
+        yi = self.bn3(self.relu(self.conv3_2(concat))) #4x256x4x32x32
+        concat = torch.cat([yi, yg, yh], 1)
+        yj = self.bn3(self.relu(self.conv3_3(concat))) #4x256x4x32x32
+        y3 = yj #4x256x4x32x32
+
+        yk = self.pool(y3) #4x256x2x16x16
+        yl = self.bn4(self.relu(self.conv4_1(yk))) #4x512x2x16x16
+        concat = torch.cat([yk, yl], 1)
+        ym = self.bn4(self.relu(self.conv4_2(concat))) #4x512x2x16x16
+        concat = torch.cat([ym, yk, yl], 1)
+        yn = self.bn4(self.relu(self.conv4_3(concat))) #4x512x2x16x16
+        y4 = yn #4x512x2x16x16
+
+        #middle
+        y = self.pool(y4) #4x512x1x8x8
+        y = self.bn4(self.relu(self.conv5_1(y))) #4x512x1x8x8
+        y = self.bn5(self.relu(self.conv5_2(y))) #4x1024x1x8x8
+        y = self.bn4(self.relu(self.conv5_3(y))) #4x512x1x8x8
+
+        #decoder
+        y = self.bn4(self.relu(self.deconv6_1(y))) #4x512x2x16x16
+        concat = torch.cat([y,y4], 1) #y + y4 #4x512x2x16x16
+        yo = self.bn4(self.relu(self.conv6_2(concat)))  #4x512x2x16x16
+        concat = torch.cat([y, yo], 1)
+        yp = self.bn4(self.relu(self.conv6_3(concat))) #4x512x2x16x16
+        concat = torch.cat([y, yo, yp], 1)
+        yq = self.bn3(self.relu(self.conv6_4(concat))) #4x256x2x16x16
+
+
+        y = self.bn3(self.relu(self.deconv7_1(yq))) #4x256x4x32x32
+
+        concat = torch.cat([y,y3], 1) #y = y + y3 #4x256x4x32x32
+        yr = self.bn3(self.relu(self.conv7_2(concat))) #4x256x4x32x32
+        concat = torch.cat([y, yr], 1)
+        ys = self.bn3(self.relu(self.conv7_3(concat))) #4x256x4x32x32
+        concat = torch.cat([y, yr, ys], 1)
+        yt = self.bn2(self.relu(self.conv7_4(concat))) #4x128x4x32x32
+
+
+        y = self.bn2(self.relu(self.deconv8_1(yt))) #4x128x8x64x64
+        concat = torch.cat([y, y2], 1) #y = y + y2 #4x128x8x64x64
+        yu = self.bn2(self.relu(self.conv8_2(concat))) #4x128x8x64x64
+        concat = torch.cat([y, yu], 1)
+        yv = self.bn2(self.relu(self.conv8_3(concat))) #4x128x8x64x64
+        concat = torch.cat([y, yu, yv], 1)
+        yx = self.bn1(self.relu(self.conv8_4(concat))) #4x64x8x64x64
+
+
+        y = self.bn1(self.relu(self.deconv9_1(yx))) #4x64x16x128x128
+        concat = torch.cat([y, y1], 1)#y = y + y1
+        yy = self.bn1(self.relu(self.conv9_2(concat)))
+        yw = self.bn1(self.relu(self.conv9_3(yy)))
+        y = self.outputer(self.relu(self.conv9_4(yw)))
+
+        return y
+
+class DENSE_UNET_3D(nn.Module):
+
+    def __init__(self):
+
+        super().__init__()
+        #encoder
+        self.relu = nn.ReLU(inplace=True)
+        self.conv1_1 = nn.Conv3d(1, 64, kernel_size=3, padding=1)
+        self.conv1_2 = nn.Conv3d(64, 64, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm3d(64)
+        self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
+
+        self.conv2_1 = nn.Conv3d(64, 128, kernel_size=3, padding=1)
+        self.conv2_2 = nn.Conv3d(192, 128, kernel_size=3, padding=1)
+        self.conv2_3 = nn.Conv3d(320, 128, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm3d(128)
+
+        self.conv3_1 = nn.Conv3d(128, 256, kernel_size=3, padding=1)
+        self.conv3_2 = nn.Conv3d(384, 256, kernel_size=3, padding=1)
+        self.conv3_3 = nn.Conv3d(640, 256, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm3d(256)
+
+        self.conv4_1 = nn.Conv3d(256, 512, kernel_size=3, padding=1)
+        self.conv4_2 = nn.Conv3d(768, 512, kernel_size=3, padding=1)
+        self.conv4_3 = nn.Conv3d(1280, 512, kernel_size=3, padding=1)
+        self.bn4 = nn.BatchNorm3d(512)
+
+        #middle
+        self.conv5_1 = nn.Conv3d(512, 512, kernel_size=3, padding=1)
+        self.conv5_2 = nn.Conv3d(512, 1024, kernel_size=3, padding=1)
+        self.conv5_3 = nn.Conv3d(1024, 512, kernel_size=3, padding=1)
+        self.bn5 = nn.BatchNorm3d(1024)
+
+        #decoder
+        self.deconv6_1 = nn.ConvTranspose3d(512, 512, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.conv6_2 = nn.Conv3d(512, 512, kernel_size=3, padding=1)
+        self.conv6_3 = nn.Conv3d(1024, 512, kernel_size=3, padding=1)
+        self.conv6_4 = nn.Conv3d(1536, 256, kernel_size=3, padding=1)
+
+        self.deconv7_1 = nn.ConvTranspose3d(256, 256, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.conv7_2 = nn.Conv3d(256, 256, kernel_size=3, padding=1)
+        self.conv7_3 = nn.Conv3d(512, 256, kernel_size=3, padding=1)
+        self.conv7_4 = nn.Conv3d(768, 128, kernel_size=3, padding=1)
+
+        self.deconv8_1 = nn.ConvTranspose3d(128, 128, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.conv8_2 = nn.Conv3d(128, 128, kernel_size=3, padding=1)
+        self.conv8_3 = nn.Conv3d(256, 128, kernel_size=3, padding=1)
+        self.conv8_4 = nn.Conv3d(384, 64, kernel_size=3, padding=1)
+
+        self.deconv9_1 = nn.ConvTranspose3d(64, 64, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.conv9_2 = nn.Conv3d(64, 64, kernel_size=3, padding=1)
+        self.conv9_3 = nn.Conv3d(64, 64, kernel_size=3, padding=1)
+        self.conv9_4 = nn.Conv3d(64, 1, kernel_size=1)
+        self.outputer = nn.Tanh()
+
+    def forward(self, x):
+
+        #encoder
+        #4x1x16x128x128
+        y = self.bn1(self.relu(self.conv1_1(x))) #4x64x16x128x128
+        y = self.bn1(self.relu(self.conv1_2(y))) #4x64x16x128x128
+        y1 = y #4x64x16x128x128
+        y = self.pool(y) #4x64x8x64x64
+
+
+        ya = self.bn2(self.relu(self.conv2_1(y)))   #4x128x8x64x64
+        concat = torch.cat([y,ya], 1)
+        yb = self.bn2(self.relu(self.conv2_2(concat))) #4x128x8x64x64
+        concat = torch.cat([y, ya, yb], 1)
+        yc = self.bn2(self.relu(self.conv2_3(concat))) #4x128x8x64x64
+        y2 = yc #4x128x8x64x64
+
+        yg = self.pool(y2) #4x128x4x32x32
+        yh = self.bn3(self.relu(self.conv3_1(yg))) #4x256x4x32x32
+        concat = torch.cat([yg, yh], 1)
+        yi = self.bn3(self.relu(self.conv3_2(concat))) #4x256x4x32x32
+        concat = torch.cat([yi, yg, yh], 1)
+        yj = self.bn3(self.relu(self.conv3_3(concat))) #4x256x4x32x32
+        y3 = yj #4x256x4x32x32
+
+        yk = self.pool(y3) #4x256x2x16x16
+        yl = self.bn4(self.relu(self.conv4_1(yk))) #4x512x2x16x16
+        concat = torch.cat([yk, yl], 1)
+        ym = self.bn4(self.relu(self.conv4_2(concat))) #4x512x2x16x16
+        concat = torch.cat([ym, yk, yl], 1)
+        yn = self.bn4(self.relu(self.conv4_3(concat))) #4x512x2x16x16
+        y4 = yn #4x512x2x16x16
+
+        #middle
+        y = self.pool(y4) #4x512x1x8x8
+        y = self.bn4(self.relu(self.conv5_1(y))) #4x512x1x8x8
+        y = self.bn5(self.relu(self.conv5_2(y))) #4x1024x1x8x8
+        y = self.bn4(self.relu(self.conv5_3(y))) #4x512x1x8x8
+
+        #decoder
+        y = self.bn4(self.relu(self.deconv6_1(y))) #4x512x2x16x16
+        y = y + y4 #4x512x2x16x16
+        yo = self.bn4(self.relu(self.conv6_2(y)))  #4x512x2x16x16
+        concat = torch.cat([y, yo], 1)
+        yp = self.bn4(self.relu(self.conv6_3(concat))) #4x512x2x16x16
+        concat = torch.cat([y, yo, yp], 1)
+        yq = self.bn3(self.relu(self.conv6_4(concat))) #4x256x2x16x16
+
+
+        y = self.bn3(self.relu(self.deconv7_1(yq))) #4x256x4x32x32
+        y = y + y3 #4x256x4x32x32
+        yr = self.bn3(self.relu(self.conv7_2(y))) #4x256x4x32x32
+        concat = torch.cat([y, yr], 1)
+        ys = self.bn3(self.relu(self.conv7_3(concat))) #4x256x4x32x32
+        concat = torch.cat([y, yr, ys], 1)
+        yt = self.bn2(self.relu(self.conv7_4(concat))) #4x128x4x32x32
+
+
+        y = self.bn2(self.relu(self.deconv8_1(yt))) #4x128x8x64x64
+        y = y + y2 #4x128x8x64x64
+        yu = self.bn2(self.relu(self.conv8_2(y))) #4x128x8x64x64
+        concat = torch.cat([y, yu], 1)
+        yv = self.bn2(self.relu(self.conv8_3(concat))) #4x128x8x64x64
+        concat = torch.cat([y, yu, yv], 1)
+        yx = self.bn1(self.relu(self.conv8_4(concat))) #4x64x8x64x64
+
+
+        y = self.bn1(self.relu(self.deconv9_1(yx))) #4x64x16x128x128
+        y = y + y1
+        yy = self.bn1(self.relu(self.conv9_2(y)))
+        yw = self.bn1(self.relu(self.conv9_3(yy)))
+        y = self.outputer(self.relu(self.conv9_4(yw)))
+
+        return y
+
 class UNET_3D(nn.Module):
 
     def __init__(self):

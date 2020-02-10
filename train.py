@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from data_loader import Tomographic_Dataset
 
 
-from UNET import UNET_3D
+from UNET import FULLY_DENSE_UNET_3D
 
 import numpy as np
 import time
@@ -27,17 +27,17 @@ crop      = False
 weighted = False
 
 projs = 4
-net = "UNET3D"
+net = "FULLY-DENSE-UNET3D"
 
 
-batch_size = 4 #antes 10
+batch_size = 2 #antes 10
 epochs     = 10
 
 momentum   = 0.5
 w_decay    = 0 #antes 1e-5
 
 #after each 'step_size' epochs, the 'lr' is reduced by 'gama'
-lr         = 0.001 # antes le-4 (VGG-UNET)
+lr         = 0.0001 # antes le-4 (VGG-UNET)
 step_size  = 2
 gamma      = 0.5
 
@@ -45,8 +45,8 @@ gamma      = 0.5
 
 configs         = "{}-model-{}-projs".format(net,projs)
 
-train_file      = "train.csv"
-val_file        = "validation.csv"
+train_file      = "train2.csv"
+val_file        = "validation2.csv"
 input_dir       = "D:\\Datasets\\demo_plates_{}_projs\\input\\".format(projs)
 target_dir      = "D:\\Datasets\\demo_plates_{}_projs\\target\\".format(projs)
 
@@ -71,7 +71,7 @@ val_data = Tomographic_Dataset(csv_file=val_file, phase='val', flip_rate=0, trai
 val_loader = DataLoader(val_data, batch_size=1, num_workers=0)
 
 
-fcn_model = UNET_3D()
+fcn_model = FULLY_DENSE_UNET_3D()
 
 
 if use_gpu:
@@ -144,9 +144,12 @@ def val(epoch):
         output = fcn_model(inputs)
         output = output.data.cpu().numpy()
 
-        N, _, h, w = output.shape
-        pred = output.transpose(0, 2, 3, 1).reshape(-1, 1).reshape(N, h, w)
-        target = batch['l'].cpu().numpy().reshape(N, h, w)
+        N, _, z, h, w = output.shape
+        #print(output.shape)
+        #pred = output.transpose(0, 2, 3, 1).reshape(-1, 1).reshape(N, z,  h, w)
+        pred = output.reshape(N, z, h, w)
+        target = batch['l'].cpu().numpy().reshape(N, z, h, w)
+        #print(target.shape)
 
         #if iter == 1:
         #    misc.imsave('pred.png', pred[0,:,:])

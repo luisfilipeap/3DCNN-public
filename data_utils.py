@@ -18,7 +18,7 @@ import os
 import numpy as np
 import pandas as pd
 from math import floor
-import scipy.misc
+
 import random
 from imageio import imread
 
@@ -32,7 +32,7 @@ split_proportion:   proportion of data into the training, validation, and testin
 
 
 src_img = "D:\\Datasets\\demo_data_plates\\"
-split_proportion = [.6, .2, .2]
+split_proportion = [.3, .1, .1]
 
 
 
@@ -42,18 +42,21 @@ def get_train_val_test(src_data, proportion):
     scans = os.listdir(src_data)
     random.shuffle(scans)
 
-    training = scans[0:floor(len(scans) * proportion[0])]
-    validation = scans[floor(len(scans) * proportion[0]):floor(len(scans) * proportion[0]) + floor(len(scans) * proportion[1])]
-    test = scans[floor(len(scans) * proportion[0]) + floor(len(scans) * proportion[1]):len(scans)]
+    t1 = floor(len(scans) * proportion[0])
+    t2 = t1 + floor(len(scans) * proportion[1])
+    t3 = t2 + floor(len(scans) * proportion[2])
+    training = scans[0:t1]
+    validation = scans[t1:t2]
+    test = scans[t2:t3]
 
     return training, validation, test
 
 def create_csv_files(src_data, proportion):
 
-    if not os.path.isfile('train.csv') and not os.path.isfile('validation.csv') and not os.path.isfile('train.csv'):
-        train_file = open('train.csv','w')
-        val_file = open('validation.csv','w')
-        test_file = open('test.csv','w')
+    if not os.path.isfile('train2.csv') and not os.path.isfile('validation2.csv') and not os.path.isfile('train2.csv'):
+        train_file = open('train2.csv','w')
+        val_file = open('validation2.csv','w')
+        test_file = open('test2.csv','w')
 
         train_set, val_set, test_set= get_train_val_test(src_img, proportion)
 
@@ -89,5 +92,5 @@ def data_mean_value(csv, dir):
 
 
 if __name__ == "__main__":
-    #create_csv_files(src_img, split_proportion)
-    print(data_mean_value("test.csv", src_img))
+    create_csv_files(src_img, split_proportion)
+    #print(data_mean_value("test.csv", src_img))
