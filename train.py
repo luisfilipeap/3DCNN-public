@@ -185,4 +185,4 @@ if __name__ == "__main__":
     print("DAYS:HOURS:MIN:SEC")
     print("%d:%d:%d:%d" % (d.day - 1, d.hour, d.minute, d.second))
 
-    np.save('validation_accuracy_{}-model-{}-projs.npy'.format(net,projs), validation_accuracy)
+    np.save('validation_accuracy_{}-model.npy'.format(net), validation_accuracy)
