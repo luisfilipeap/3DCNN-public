@@ -32,12 +32,12 @@ debug:              flag to allow intermediate visualization
 residual_learning:  flag to activate the residual learning scheme discussed in the literature
 
 """
-h, w = 128, 128
-z = 10
+h, w = 32, 64
+z = 16
 
-low_quality_dir = 'D:\\Datasets\\demo_plates_4_projs\\input\\'
-high_quality_dir = 'D:\\Datasets\\demo_data_plates\\'
-target_dir = "D:\\Datasets\\demo_plates_4_projs\\target\\"
+low_quality_dir = 'D:\\Datasets\\lamino_attachable_circular_90\\input\\'
+high_quality_dir = 'D:\\Datasets\\lamino_attachable\\'
+target_dir = "D:\\Datasets\\lamino_attachable_circular_90\\target-residual\\"
 
 #TEMP
 #low_quality_dir = 'D:\\DADOS\\datasets-doutorado\\APPLE-DL-EXTENDED-128-zero-rot-121-projs\\input\\'
@@ -64,7 +64,7 @@ for folder in os.listdir(high_quality_dir):
                 if residual_learning:
                     target = (input_img-output_img)/255
                 else:
-                    target = output_img
+                    target = output_img/255
 
 
                 box[i,:,:] = target

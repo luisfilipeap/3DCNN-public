@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from data_loader import Tomographic_Dataset
 
 
-from UNET import FULLY_DENSE_UNET_3D
+from UNET import UNET_3D
 
 import numpy as np
 import time
@@ -26,29 +26,28 @@ ssim_loss = False
 crop      = False
 weighted = False
 
-projs = 4
-net = "FULLY-DENSE-UNET3D"
+net = "UNET3D"
 
 
-batch_size = 2 #antes 10
-epochs     = 10
+batch_size = 10 #antes 10
+epochs     = 50
 
 momentum   = 0.5
 w_decay    = 0 #antes 1e-5
 
 #after each 'step_size' epochs, the 'lr' is reduced by 'gama'
-lr         = 0.0001 # antes le-4 (VGG-UNET)
+lr         = 0.00001 # antes le-4 (VGG-UNET)
 step_size  = 2
 gamma      = 0.5
 
 
 
-configs         = "{}-model-{}-projs".format(net,projs)
+configs         = "{}-model".format(net)
 
-train_file      = "train2.csv"
-val_file        = "validation2.csv"
-input_dir       = "D:\\Datasets\\demo_plates_{}_projs\\input\\".format(projs)
-target_dir      = "D:\\Datasets\\demo_plates_{}_projs\\target\\".format(projs)
+train_file      = "train.csv"
+val_file        = "validation.csv"
+input_dir       = "D:\\Datasets\\lamino_attachable_circular_90\\input\\"
+target_dir      = "D:\\Datasets\\lamino_attachable_circular_90\\target-residual\\"
 
 
 validation_accuracy = np.zeros((epochs,1))
@@ -67,11 +66,11 @@ train_data = Tomographic_Dataset(csv_file=train_file, phase='train', train_csv=t
 train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=0)
 
 #directory of training files is passed to obtain the mean value of the images in the trained set which is not trained in the CNN
-val_data = Tomographic_Dataset(csv_file=val_file, phase='val', flip_rate=0, train_csv=train_file, input_dir=input_dir, target_dir=target_dir)
+val_data = Tomographic_Dataset(csv_file=val_file, phase='val', train_csv=train_file, input_dir=input_dir, target_dir=target_dir)
 val_loader = DataLoader(val_data, batch_size=1, num_workers=0)
 
 
-fcn_model = FULLY_DENSE_UNET_3D()
+fcn_model = UNET_3D()
 
 
 if use_gpu:

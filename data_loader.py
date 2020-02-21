@@ -33,24 +33,24 @@ train_dim:      dimensions (h,w) of the cropped files used in the training stage
 note: please see the comment above the attribute self.data when the phase is 'train' in the constructor of Tomographic_Dataset
 """
 
-original_src = "D:\\Datasets\\demo_data_plates\\"
-train_dim   = (10, 128, 128)
+original_src = "D:\\Datasets\\lamino_attachable\\"
+train_dim   = (16, 32, 64)
 
 
 class Tomographic_Dataset(Dataset):
 
     #directory of training files is passed to obtain the mean value of the images in the trained set which is not trained in the CNN
-    def __init__(self, csv_file, phase, input_dir, target_dir,  crop=False, flip_rate=0., train_csv = ""):
+    def __init__(self, csv_file, phase, input_dir, target_dir,  crop=False, high_quality_rate=0.5, train_csv = ""):
         self.data      = pd.read_csv(csv_file)
         self.means     = data_mean_value(train_csv, input_dir) / 255.
         self.input_dir = input_dir
         self.target_dir= target_dir
 
-        self.flip_rate = flip_rate
+        self.high_quality_rate = high_quality_rate
 
         if phase == 'train':
             self.crop      = crop
-            self.flip_rate = 0.5
+
             self.new_z = train_dim[0]
             self.new_h = train_dim[1]
             self.new_w = train_dim[2]
@@ -65,28 +65,34 @@ class Tomographic_Dataset(Dataset):
 
     def __getitem__(self, idx):
         img_name   = self.data.iloc[idx, 0]
-        #create cube
-        input_box = np.zeros((1, 16, 128,128))
-        output_box = np.zeros((16, 128, 128))
-        count = 0
-        for file in os.listdir(self.input_dir+img_name):
-            slice     = imread(self.input_dir+img_name+"\\"+file, pilmode='F')
-            input_box[0, count+3, :, :] = slice
-            count = count + 1
-
         label_name = self.data.iloc[idx, 1]
-        label      = np.load(self.target_dir+label_name)
-        output_box[3:13, :, :] = label
+        #create cube
+        input_box = np.zeros((1, 16, 32, 64))
+        output_box = np.zeros((16, 32, 64))
+        count = 0
+
+        if random.random() > self.high_quality_rate:
+            src = self.input_dir
+            label = np.load(self.target_dir + label_name)
+            output_box[:, :, :] = label
+        else:
+            src = original_src
+            label = np.zeros((16, 32, 64))
+
+        for file in os.listdir(src+img_name):
+            slice     = imread(src+img_name+"\\"+file, pilmode='F')
+            input_box[0, count, :, :] = slice
+            count = count + 1
 
 
         (_, file) = os.path.split(label_name)
 
-        original_box = np.zeros((16, 128, 128))
+        original_box = np.zeros((16, 32, 64))
         original   = original_src+img_name
         count = 0
         for file in os.listdir(original):
             slice     = imread(original+"\\"+file, pilmode='F')
-            original_box[count+3, :, :] = slice
+            original_box[count, :, :] = slice
             count = count + 1
 
 
