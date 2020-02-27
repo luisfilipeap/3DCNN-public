@@ -33,8 +33,8 @@ train_dim:      dimensions (h,w) of the cropped files used in the training stage
 note: please see the comment above the attribute self.data when the phase is 'train' in the constructor of Tomographic_Dataset
 """
 
-original_src = "D:\\Datasets\\demo_data_plates\\"
-train_dim   = (10, 128, 128)
+original_src = "D:\\Datasets\\lamino_attachable\\"
+train_dim   = (16, 32, 64)
 
 
 class Tomographic_Dataset(Dataset):
@@ -66,27 +66,27 @@ class Tomographic_Dataset(Dataset):
     def __getitem__(self, idx):
         img_name   = self.data.iloc[idx, 0]
         #create cube
-        input_box = np.zeros((1, 16, 128,128))
-        output_box = np.zeros((16, 128, 128))
+        input_box = np.zeros((1, 16, 32, 64))
+        output_box = np.zeros((16, 32, 64))
         count = 0
         for file in os.listdir(self.input_dir+img_name):
             slice     = imread(self.input_dir+img_name+"\\"+file, pilmode='F')
-            input_box[0, count+3, :, :] = slice
+            input_box[0, count, :, :] = slice
             count = count + 1
 
         label_name = self.data.iloc[idx, 1]
         label      = np.load(self.target_dir+label_name)
-        output_box[3:13, :, :] = label
+        output_box[:, :, :] = label
 
 
         (_, file) = os.path.split(label_name)
 
-        original_box = np.zeros((16, 128, 128))
+        original_box = np.zeros((16, 32, 64))
         original   = original_src+img_name
         count = 0
         for file in os.listdir(original):
             slice     = imread(original+"\\"+file, pilmode='F')
-            original_box[count+3, :, :] = slice
+            original_box[count, :, :] = slice
             count = count + 1
 
 

@@ -15,11 +15,11 @@ from torchvision import utils
 #from skimage.filters.rank import median
 from imageio import imwrite
 
-net             = 'DENSE-UNET3D'
-projs           =  4
-input_dir       = "D:\\Datasets\\demo_plates_{}_projs\\input\\".format(projs)
-target_dir      = "D:\\Datasets\\demo_plates_{}_projs\\target\\".format(projs)
-means           = data_mean_value("train2.csv", input_dir) / 255.
+net             = 'RED-UNET3D'
+projs           =  10
+input_dir       = "D:\\Datasets\\lamino_attachable_{}_projs\\input\\".format(projs)
+target_dir      = "D:\\Datasets\\lamino_attachable_{}_projs\\target\\".format(projs)
+means           = data_mean_value("train.csv", input_dir) / 255.
 
 model_src = "./models/{}-model-{}-projs".format(net, projs)
 
@@ -27,7 +27,7 @@ model_src = "./models/{}-model-{}-projs".format(net, projs)
 
 def evaluate_img():
 
-    test_data = Tomographic_Dataset(csv_file="test2.csv", phase='val', flip_rate=0, train_csv="train2.csv",
+    test_data = Tomographic_Dataset(csv_file="test.csv", phase='val', flip_rate=0, train_csv="train.csv",
                                     input_dir=input_dir, target_dir=target_dir)
     test_loader = DataLoader(test_data, batch_size=1, num_workers=1)
 
@@ -94,10 +94,10 @@ def evaluate_img():
 
         #gt = input[0,:,:,:]-target
 
-        #for i in range(16):
-            #imwrite(dest+"\\pred\\slice_{:02d}.png".format(i), final_rec[0,i,:,:])
-            #imwrite(dest+"\\gt\\slice_{:02d}.png".format(i), original[0,i,:,:] )
-            #imwrite(dest+"\\input\\slice_{:02d}.png".format(i), input[0, 0,i,:,:])
+        for i in range(16):
+            imwrite(dest+"\\pred\\slice_{:02d}.png".format(i), final_rec[0,i,:,:])
+            imwrite(dest+"\\gt\\slice_{:02d}.png".format(i), original[0,i,:,:] )
+            imwrite(dest+"\\input\\slice_{:02d}.png".format(i), input[0, 0,i,:,:])
             #imwrite(dest+"\\output_silce_{}.png".format(i), y[0,i,:,:])
 
 

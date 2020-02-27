@@ -31,8 +31,8 @@ split_proportion:   proportion of data into the training, validation, and testin
 """
 
 
-src_img = "D:\\Datasets\\demo_data_plates\\"
-split_proportion = [.3, .1, .1]
+src_img = "D:\\Datasets\\lamino_attachable\\"
+split_proportion = [.6, .2, .2]
 
 
 
@@ -53,10 +53,10 @@ def get_train_val_test(src_data, proportion):
 
 def create_csv_files(src_data, proportion):
 
-    if not os.path.isfile('train2.csv') and not os.path.isfile('validation2.csv') and not os.path.isfile('train2.csv'):
-        train_file = open('train2.csv','w')
-        val_file = open('validation2.csv','w')
-        test_file = open('test2.csv','w')
+    if not os.path.isfile('train.csv') and not os.path.isfile('validation.csv') and not os.path.isfile('train.csv'):
+        train_file = open('train.csv','w')
+        val_file = open('validation.csv','w')
+        test_file = open('test.csv','w')
 
         train_set, val_set, test_set= get_train_val_test(src_img, proportion)
 
